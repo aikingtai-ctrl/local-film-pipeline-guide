@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全本地影视流水线 · 小白搭建指南</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --tx:#e8eaed; --tx2:#a8afbd; --tx3:#727a8a;
+    --acc:#e0793a; --acc2:#f0a868; --ok:#4ec98a; --warn:#e8b84b; --info:#5aa9e6;
+    --code:#12141a; --radius:14px;
+    --mono:'SFMono-Regular',ui-monospace,Consolas,'Cascadia Code',monospace;
+    --sans:-apple-system,'Segoe UI','Microsoft YaHei',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);
+       line-height:1.75;font-size:16px}
+  a{color:var(--acc2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{display:flex;max-width:1280px;margin:0 auto;gap:32px;padding:0 24px}
+  /* sidebar */
+  nav{position:sticky;top:0;height:100vh;width:230px;flex-shrink:0;overflow-y:auto;
+      padding:28px 0;border-right:1px solid var(--line)}
+  nav .brand{font-weight:800;font-size:15px;color:var(--acc);letter-spacing:.5px;margin-bottom:18px}
+  nav a{display:block;color:var(--tx2);font-size:13.5px;padding:6px 12px;border-radius:8px;margin:2px 0}
+  nav a:hover{background:var(--panel);color:var(--tx);text-decoration:none}
+  nav .sub{padding-left:24px;font-size:12.5px;color:var(--tx3)}
+  main{flex:1;min-width:0;padding:44px 0 120px}
+  /* hero */
+  .hero{background:linear-gradient(160deg,#1c2029,#141821);border:1px solid var(--line);
+        border-radius:var(--radius);padding:38px 34px;margin-bottom:36px}
+  .hero h1{margin:0 0 10px;font-size:30px;line-height:1.25}
+  .hero p{margin:0;color:var(--tx2);font-size:16px}
+  .badges{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+         padding:5px 14px;font-size:13px;color:var(--tx2)}
+  .badge b{color:var(--acc2)}
+  h2{font-size:23px;margin:52px 0 6px;padding-top:12px;scroll-margin-top:20px}
+  h2 .n{display:inline-block;width:30px;height:30px;line-height:30px;text-align:center;
+        background:var(--acc);color:#fff;border-radius:9px;font-size:15px;margin-right:12px;vertical-align:2px}
+  h3{font-size:18px;margin:30px 0 8px;color:var(--acc2)}
+  .lead{color:var(--tx2);margin:4px 0 22px;font-size:15.5px}
+  p{margin:12px 0}
+  ul,ol{padding-left:22px} li{margin:6px 0}
+  code{font-family:var(--mono);background:var(--panel2);padding:2px 7px;border-radius:6px;
+       font-size:13.5px;color:var(--acc2)}
+  /* callouts */
+  .box{border-radius:12px;padding:16px 18px 16px 46px;margin:18px 0;position:relative;
+       border:1px solid var(--line);font-size:14.5px;background:var(--panel)}
+  .box::before{position:absolute;left:16px;top:15px;font-size:18px}
+  .tip{border-color:#2e5a3f;background:#14201a} .tip::before{content:"💡"}
+  .warn{border-color:#5c4a1e;background:#211d12} .warn::before{content:"⚠️"}
+  .ok{border-color:#245544;background:#12201a} .ok::before{content:"✅"}
+  .info{border-color:#254a63;background:#121c24} .info::before{content:"ℹ️"}
+  .box b{color:var(--tx)}
+  /* code block */
+  .cb{position:relative;margin:16px 0}
+  .cb pre{background:var(--code);border:1px solid var(--line);border-radius:12px;
+          padding:16px 18px;overflow-x:auto;margin:0;font-family:var(--mono);
+          font-size:13px;line-height:1.65;color:#d4d8e0}
+  .cb .cap{font-size:12px;color:var(--tx3);margin:0 0 6px;padding-left:2px}
+  .cb .copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--tx2);
+            border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:12px;
+            cursor:pointer;font-family:var(--sans)}
+  .cb .copy:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .cmt{color:#6b7280}
+  /* step */
+  .step{border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin:18px 0;
+        background:var(--panel)}
+  .step .st-h{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .step .st-n{background:var(--acc);color:#fff;width:26px;height:26px;border-radius:8px;
+              display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .step .st-h h3{margin:0;color:var(--tx);font-size:17px}
+  .step .where{margin-left:auto;font-size:12px;color:var(--tx3);background:var(--panel2);
+               padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
+  /* table */
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--tx);font-weight:600}
+  td{color:var(--tx2)} td b{color:var(--tx)}
+  tr:nth-child(even) td{background:#14171d}
+  /* pipeline */
+  .flow{display:flex;flex-direction:column;gap:0;margin:20px 0}
+  .stg{display:flex;gap:16px;align-items:stretch}
+  .stg .num{flex-shrink:0;width:44px;display:flex;flex-direction:column;align-items:center}
+  .stg .dot{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#fff;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+  .stg .bar{flex:1;width:2px;background:var(--line)}
+  .stg:last-child .bar{display:none}
+  .stg .card{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+             padding:13px 18px;margin-bottom:14px}
+  .stg .card .t{font-weight:600;color:var(--tx)}
+  .stg .card .d{font-size:13.5px;color:var(--tx2);margin-top:2px}
+  .stg .card .gpu{font-size:12px;color:var(--acc2);margin-top:6px}
+  /* checklist */
+  .check label{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);
+               border-radius:10px;margin:8px 0;background:var(--panel);cursor:pointer;font-size:14.5px}
+  .check input{margin-top:5px;width:17px;height:17px;accent-color:var(--acc);flex-shrink:0}
+  .check input:checked + span{color:var(--tx3);text-decoration:line-through}
+  /* glossary */
+  .gl{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:16px 0}
+  .gl div{display:grid;grid-template-columns:150px 1fr;border-top:1px solid var(--line)}
+  .gl div:first-child{border-top:none}
+  .gl div>span:first-child{background:var(--panel2);padding:11px 14px;font-weight:600;color:var(--acc2);font-size:14px}
+  .gl div>span:last-child{padding:11px 14px;color:var(--tx2);font-size:14px}
+  details{border:1px solid var(--line);border-radius:12px;padding:0 18px;margin:14px 0;background:var(--panel)}
+  details summary{cursor:pointer;padding:14px 0;font-weight:600;color:var(--acc2)}
+  details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+  .foot{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+  @media(max-width:860px){nav{display:none}.wrap{padding:0 16px}main{padding:24px 0 80px}
+    .gl div{grid-template-columns:110px 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand">🎬 本地影视流水线</div>
+  <a href="#what">① 这是什么</a>
+  <a href="#need">② 需要准备什么</a>
+  <a href="#map">③ 全景流程图</a>
+  <a href="#fleet">④ 12 张卡怎么分工</a>
+  <a href="#build">⑤ 动手搭建</a>
+  <a href="#build" class="sub">5.1 装 n8n(总指挥台)</a>
+  <a href="#build" class="sub">5.2 装 vLLM(大脑)</a>
+  <a href="#build" class="sub">5.3 装 SwarmUI(画面引擎)</a>
+  <a href="#build" class="sub">5.4 装 声音三件套</a>
+  <a href="#build" class="sub">5.5 共享硬盘</a>
+  <a href="#build" class="sub">5.6 在 n8n 里搭线</a>
+  <a href="#run">⑥ 流水线怎么跑</a>
+  <a href="#json">⑦ 核心文件 project.json</a>
+  <a href="#faq">⑧ 常见问题</a>
+  <a href="#glossary">⑨ 名词对照表</a>
+  <a href="#checklist">⑩ 搭建检查清单</a>
+</nav>
+
+<main>
+  <div class="hero">
+    <h1>全本地影视流水线 · 从剧本到成片</h1>
+    <p>一份给「小白」的搭建指南 —— 剧本丢进去,成片自动出来,全程在你自己的两台服务器上跑,不上云、不花 API 钱、素材不外泄。</p>
+    <div class="badges">
+      <span class="badge">🔒 <b>全本地</b> 数据不出门</span>
+      <span class="badge">🖥️ <b>8×H100 + 4×5090</b> 双服务器</span>
+      <span class="badge">🤖 <b>n8n</b> 全自动编排</span>
+      <span class="badge">🎞️ 剧本 → 成片 一条龙</span>
+    </div>
+  </div>
+
+  <!-- ① -->
+  <h2 id="what"><span class="n">1</span>这是什么?一句话讲清</h2>
+  <p class="lead">你写好剧本,机器自动帮你拆分镜、画面、生成视频、配音、配乐、剪辑,最后吐出一部成片。</p>
+  <div class="box tip"><b>打个比方:一条自动化的「影视工厂流水线」。</b><br>
+    剧本是「原材料」,从传送带一头放进去;沿途有 9 个「工位」各干一件事(切分镜、画图、生成视频、配音……);
+    最后一头出来的是「成品」——一部 mp4。<br><br>
+    而 <b>n8n</b> 就是这条流水线的「总控制台」:它不亲自干活,而是按顺序指挥每个工位、传递半成品、出问题自动重做。</p>
+  <p>整套东西全部装在你自己的机器上。「本地」意味着:不联网也能跑、不给任何公司交钱、剧本和画面永远在你硬盘里。</p>
+
+  <!-- ② -->
+  <h2 id="need"><span class="n">2</span>你需要准备什么</h2>
+  <h3>硬件(你已经有了 ✅)</h3>
+  <table>
+    <tr><th>机器</th><th>配置</th><th>在流水线里的角色</th></tr>
+    <tr><td><b>服务器 A</b></td><td>8 × H100</td><td>干重活:生成视频 + 当「大脑」理解剧本</td></tr>
+    <tr><td><b>服务器 B</b></td><td>4 × 5090</td><td>画关键帧 + 配音配乐 + 收尾美化</td></tr>
+  </table>
+  <h3>软件(下面第 5 步会一步步装)</h3>
+  <table>
+    <tr><th>软件</th><th>大白话是干嘛的</th><th>装在哪</th></tr>
+    <tr><td><b>Docker</b></td><td>“绿色安装器”,一条命令装好一个软件,不弄脏系统</td><td>两台都装</td></tr>
+    <tr><td><b>n8n</b></td><td>总指挥台,把各软件串成一条自动流水线</td><td>服务器 A</td></tr>
+    <tr><td><b>Redis</b></td><td>流水线的“小黑板”,记每个镜头做到哪一步了</td><td>服务器 A</td></tr>
+    <tr><td><b>vLLM</b></td><td>“大脑”,读剧本、拆分镜、给成片打分</td><td>服务器 A(吃 2 张 H100)</td></tr>
+    <tr><td><b>SwarmUI</b></td><td>“画面工厂总管”,把画图/生成视频的活自动派给 12 张卡</td><td>A 主控,B 当帮手</td></tr>
+    <tr><td><b>IndexTTS / ACE-Step / Whisper</b></td><td>配音、配乐、字幕三件套</td><td>服务器 B(1 张 5090)</td></tr>
+    <tr><td><b>ffmpeg</b></td><td>“剪辑师”,把片段+声音+字幕拼成一整部片</td><td>随便一台</td></tr>
+  </table>
+  <div class="box info">不用一次全看懂这些名字。<b>看不懂的词,翻到最下面第 9 节「名词对照表」</b>,都有大白话解释。</div>
+
+  <!-- ③ -->
+  <h2 id="map"><span class="n">3</span>全景流程图:9 个工位</h2>
+  <p class="lead">剧本从①进,成片从⑨出。每个工位干一件事、用哪张卡,一目了然。</p>
+  <div class="flow">
+    <div class="stg"><div class="num"><div class="dot">1</div><div class="bar"></div></div>
+      <div class="card"><div class="t">剧本输入</div><div class="d">把 .txt / .md 剧本丢进指定文件夹,流水线自动开工</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">2</div><div class="bar"></div></div>
+      <div class="card"><div class="t">拆分镜(大脑读剧本)</div><div class="d">自动把剧本拆成一个个镜头:画面、对白、景别、时长、情绪</div><div class="gpu">🧠 vLLM · 2×H100</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">3</div><div class="bar"></div></div>
+      <div class="card"><div class="t">定角色 & 场景设定图</div><div class="d">先把主角长相、场景样子画定,后面全片都照这个来,保证不“换脸”</div><div class="gpu">🎨 SwarmUI · 5090</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">4</div><div class="bar"></div></div>
+      <div class="card"><div class="t">画关键帧(每个镜头一张)</div><div class="d">给每个镜头画一张“定格画面”当底图</div><div class="gpu">🎨 SwarmUI · 3×5090</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">5</div><div class="bar"></div></div>
+      <div class="card"><div class="t">图生视频(每个镜头动起来)</div><div class="d">把定格画面变成几秒的视频片段,带运镜</div><div class="gpu">🎬 SwarmUI · 6×H100</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">6</div><div class="bar"></div></div>
+      <div class="card"><div class="t">配音 / 旁白</div><div class="d">给每句对白、每段解说配上人声(可克隆固定音色)</div><div class="gpu">🎙️ IndexTTS · 5090</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">7</div><div class="bar"></div></div>
+      <div class="card"><div class="t">配乐 & 音效</div><div class="d">按每场戏的情绪自动生成背景音乐和音效</div><div class="gpu">🎵 ACE-Step · 5090</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">8</div><div class="bar"></div></div>
+      <div class="card"><div class="t">字幕 + 剪辑合成</div><div class="d">对齐字幕、拼接所有片段、贴声音、转场调色</div><div class="gpu">✂️ Whisper + ffmpeg</div></div></div>
+    <div class="stg"><div class="num"><div class="dot">9</div></div>
+      <div class="card"><div class="t">成片输出 .mp4</div><div class="d">一部完整片子。质量不达标的镜头会自动重做</div><div class="gpu">📦 交付 / 归档</div></div></div>
+  </div>
+  <div class="box tip"><b>关键点:③⑨ 这几步可以“留人工过目”。</b>比如分镜拆完、角色图画好,你先看一眼点“通过”再往下走,质量更可控。也可以设成全自动一键到底。</div>
+
+  <!-- ④ -->
+  <h2 id="fleet"><span class="n">4</span>12 张卡怎么分工</h2>
+  <p class="lead">好消息:你不用手动管每张卡。<b>SwarmUI 和 vLLM 会自动把活派给空闲的卡</b>,你只要在安装时告诉它们“这几张卡归你管”。</p>
+  <table>
+    <tr><th>机器</th><th>卡</th><th>干什么</th><th>为什么这么分</th></tr>
+    <tr><td rowspan="2"><b>A · 8×H100</b></td><td>2 张</td><td>大脑(vLLM)</td><td>H100 显存大,能装下最聪明的大模型</td></tr>
+    <tr><td>6 张</td><td>生成视频(主力)</td><td>视频最吃资源,交给最强的卡并行猛跑</td></tr>
+    <tr><td rowspan="2"><b>B · 4×5090</b></td><td>3 张</td><td>画关键帧</td><td>5090 画图飞快,适合大批量出图</td></tr>
+    <tr><td>1 张</td><td>配音+配乐+字幕+美化</td><td>这些活轻,一张卡全包</td></tr>
+  </table>
+  <div class="box ok"><b>并行的威力:</b>一集 150 个镜头的视频,单张卡要跑一整夜;6 张 H100 一起上,大约 <b>1 小时</b>就全出来了。两台服务器还能同时做两个不同的项目。</div>
+
+  <!-- ⑤ -->
+  <h2 id="build"><span class="n">5</span>动手搭建(照着敲)</h2>
+  <p class="lead">下面每一步都有可复制的命令。点命令框右上角「复制」,粘到服务器终端回车即可。<b>凡是写着 <code>← 改这里</code> 的地方,换成你自己的信息</b>(比如 IP、模型路径)。</p>
+
+  <div class="box warn"><b>开始前:</b>两台服务器都要先装好 <b>Docker</b> 和 <b>NVIDIA 显卡驱动 + NVIDIA Container Toolkit</b>(让 Docker 能用显卡)。这一步通常运维已经装好;没装的话搜“NVIDIA Container Toolkit 安装”按官方文档走一遍。验证成功:运行 <code>nvidia-smi</code> 能看到你的卡列表。</div>
+
+  <!-- 5.1 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">1</div><h3>装 n8n(总指挥台)+ Redis(小黑板)</h3><span class="where">服务器 A</span></div>
+    <p>这两个是流水线的“大脑指挥部”,不吃显卡,一起装:</p>
+    <div class="cb"><div class="cap">在服务器 A 的终端执行</div>
+<pre><span class="cmt"># 1) 启动 Redis(记录每个镜头的进度)</span>
+docker run -d --name redis -p 6379:6379 --restart always redis
+
+<span class="cmt"># 2) 启动 n8n(总指挥台,网页操作)</span>
+docker run -d --name n8n -p 5678:5678 --restart always \
+  -e GENERIC_TIMEZONE="Asia/Shanghai" \
+  -v n8n_data:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n</pre>
+    <button class="copy">复制</button></div>
+    <div class="box ok"><b>怎么算成功:</b>浏览器打开 <code>http://服务器A的IP:5678</code>,看到 n8n 的注册页面,设个账号密码就进去了。这就是你以后搭流水线、点“运行”的地方。</div>
+  </div>
+
+  <!-- 5.2 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">2</div><h3>装 vLLM(大脑:读剧本 / 打分)</h3><span class="where">服务器 A · 2×H100</span></div>
+    <p>先把大模型下载到本地(比如放 <code>~/models</code>),再用 Docker 起服务。它会占用第 0、1 号两张 H100:</p>
+    <div class="cb"><div class="cap">在服务器 A 的终端执行</div>
+<pre>docker run -d --name vllm --restart always \
+  --gpus '"device=0,1"' \                    <span class="cmt"># ← 用第 0、1 号 H100</span>
+  -p 8000:8000 \
+  -v ~/models:/models \                       <span class="cmt"># ← 改这里:你放模型的文件夹</span>
+  vllm/vllm-openai:latest \
+  --model Qwen/Qwen2.5-72B-Instruct \         <span class="cmt"># ← 大脑模型(读剧本)</span>
+  --tensor-parallel-size 2                     <span class="cmt"># 两张卡合力跑一个大模型</span></pre>
+    <button class="copy">复制</button></div>
+    <div class="box tip">质检打分(第⑨步给镜头挑毛病)要用“会看图的模型”,可以再起一个 <code>Qwen2.5-VL</code> 服务,或换成能看图的版本。先跑通文字版即可,看图的以后再加。</div>
+    <div class="box ok"><b>怎么算成功:</b>执行 <code>curl http://localhost:8000/v1/models</code> 能返回模型名字,说明大脑上线了。</div>
+  </div>
+
+  <!-- 5.3 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">3</div><h3>装 SwarmUI(画面工厂,管 12 张卡)</h3><span class="where">A 主控 + B 帮手</span></div>
+    <p>SwarmUI 是所有“画图 / 生成视频”任务的总管。你在它的网页里,把每张卡登记成一个“后端”,它就会自动把活派给空闲的卡。</p>
+    <div class="cb"><div class="cap">在服务器 A 上安装 SwarmUI(Linux)</div>
+<pre>git clone https://github.com/mcmonkeyprojects/SwarmUI
+cd SwarmUI
+./launch-linux.sh            <span class="cmt"># 首次运行会自动装依赖,按提示走完</span></pre>
+    <button class="copy">复制</button></div>
+    <p>装好后浏览器开 <code>http://服务器A的IP:7801</code>,进 <b>Server → Backends</b> 页面,按下面思路登记后端:</p>
+    <ul>
+      <li>服务器 A 上加 <b>6 个</b> ComfyUI 后端,分别绑 H100 的第 2~7 号卡(用 <code>CUDA_VISIBLE_DEVICES=2</code>、<code>=3</code>…区分)→ 专做视频</li>
+      <li>服务器 B 上再装一份 SwarmUI/ComfyUI 后端,加 <b>3 个</b>绑 5090 → 专做关键帧,登记到 A 的 SwarmUI 里当“远程帮手”</li>
+    </ul>
+    <div class="box info">这一步是全流程<b>最需要耐心</b>的地方(要一张张登记卡)。可以先只登记 1~2 张卡跑通整条流水线,验证没问题后再把剩下的卡补上。<b>具体每张卡的绑定参数,我可以在下一步「C」里给你一份逐卡配置表。</b></div>
+    <div class="box ok"><b>怎么算成功:</b>在 SwarmUI 的 <b>Generate</b> 页随便输入一句英文描述点生成,能出图,说明画面工厂通了。</div>
+  </div>
+
+  <!-- 5.4 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">4</div><h3>装声音三件套(配音 / 配乐 / 字幕)</h3><span class="where">服务器 B · 1×5090</span></div>
+    <p>这三个都比较轻,共用 B 的第 4 张 5090。装好后各自开一个网络接口,n8n 到时候调用它们:</p>
+    <table>
+      <tr><th>软件</th><th>作用</th><th>怎么装(思路)</th></tr>
+      <tr><td><b>IndexTTS2</b></td><td>配音/旁白(可克隆音色)</td><td>按其官方仓库装,用 <code>FastAPI</code> 包一个 <code>/tts</code> 接口</td></tr>
+      <tr><td><b>ACE-Step</b></td><td>按情绪生成背景音乐</td><td>官方仓库,包一个生成接口</td></tr>
+      <tr><td><b>faster-whisper</b></td><td>把配音转成字幕、对齐时间</td><td>官方仓库,包一个 <code>/transcribe</code> 接口</td></tr>
+    </table>
+    <div class="box tip">这三个的目标是:各自能通过一个网址被调用(比如 <code>http://服务器B:9880/tts</code>)。只要能用浏览器或 curl 调出结果,n8n 就能接上。</div>
+  </div>
+
+  <!-- 5.5 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">5</div><h3>建共享硬盘(两台机器看同一个文件夹)</h3><span class="where">A 和 B</span></div>
+    <p>A 生成的视频、B 生成的图,必须让两台机器都能看到。做法:在 A 上建一个共享文件夹(NFS),B 挂载它。这样两台机器眼里都是同一个 <code>/media</code>。</p>
+    <div class="cb"><div class="cap">A 当“硬盘提供方”,B 当“借用方”(示意)</div>
+<pre><span class="cmt"># 服务器 A:把 /media 共享出去(装 nfs-kernel-server 后)</span>
+echo "/media  服务器B的IP(rw,sync,no_subtree_check)" | sudo tee -a /etc/exports
+sudo exportfs -ra
+
+<span class="cmt"># 服务器 B:挂载 A 的 /media 到本地同名目录</span>
+sudo mount 服务器A的IP:/media /media       <span class="cmt"># ← 改这里两个 IP</span></pre>
+    <button class="copy">复制</button></div>
+    <div class="box warn">流水线里所有素材都放这个共享 <code>/media</code>,n8n 传递的永远是“文件路径”(比如 <code>/media/项目名/clips/xxx.mp4</code>),<b>不要在软件之间传图片本身</b>,否则内存会爆。</div>
+  </div>
+
+  <!-- 5.6 -->
+  <div class="step">
+    <div class="st-h"><div class="st-n">6</div><h3>在 n8n 里把流水线搭起来</h3><span class="where">浏览器 · n8n 网页</span></div>
+    <p>回到 <code>http://服务器A:5678</code>。流水线由 <b>1 个主流程 + 5 个子流程</b>组成,像搭积木一样在网页里拖节点、连线。你先建这几个工作流:</p>
+    <table>
+      <tr><th>工作流</th><th>负责</th><th>核心节点(在 n8n 里搜这些名字)</th></tr>
+      <tr><td><b>MAIN 主流程</b></td><td>总调度,按①→⑨顺序指挥</td><td>Webhook、Execute Workflow、Wait、HTTP Request</td></tr>
+      <tr><td><b>拆分镜</b></td><td>第②步,调 vLLM</td><td>HTTP Request(打 vLLM)、Code</td></tr>
+      <tr><td><b>画面渲染</b></td><td>第④⑤步,调 SwarmUI(关键帧和视频共用)</td><td>Split in Batches、HTTP、Wait、IF、Redis</td></tr>
+      <tr><td><b>质检</b></td><td>第⑨步,让大脑给镜头挑毛病、决定重做</td><td>HTTP(打 VLM)、IF</td></tr>
+      <tr><td><b>配音配乐</b></td><td>第⑥⑦步</td><td>HTTP(打声音三件套)</td></tr>
+      <tr><td><b>合成</b></td><td>第⑧步,ffmpeg 剪辑</td><td>Execute Command(跑 ffmpeg)</td></tr>
+    </table>
+    <div class="box info"><b>不用手写代码从零搭。</b>核心的“画面渲染”流程有固定套路:一次性把所有镜头丢给 SwarmUI → 它自动分给 12 张卡 → n8n 每 15 秒查一次“做完几个了” → 全做完再进下一步。<b>这套节点结构和里面的配置,我可以直接给你一份能导入 n8n 的文件</b>,你导进去改改地址就能用。</div>
+    <div class="box ok"><b>怎么算成功:</b>在 MAIN 流程点“Test workflow”,丢一小段剧本,能看到节点一个个变绿、最后 <code>/media</code> 里出现成片 mp4,整条线就通了。</div>
+  </div>
+
+  <!-- ⑥ -->
+  <h2 id="run"><span class="n">6</span>搭好之后,平时怎么用</h2>
+  <ol>
+    <li>把写好的剧本存成 <code>.txt</code>,放进监听文件夹(比如 <code>/media/inbox/</code>)。</li>
+    <li>流水线自动开工,或你在 n8n 点一下“运行”。</li>
+    <li>到了“留人工过目”的节点(分镜、角色图),你手机/电脑会收到通知,点开看一眼,满意就点“通过”。</li>
+    <li>等 1~2 小时,去 <code>/media/项目名/out/</code> 拿成片。质量差的镜头系统已自动重做过。</li>
+  </ol>
+  <div class="box tip">两台服务器 12 张卡,可以<b>同时推进两个项目</b>——比如横屏纪录片和竖屏短剧一起产。</div>
+
+  <!-- ⑦ -->
+  <h2 id="json"><span class="n">7</span>核心文件 project.json:整条线的“施工总表”</h2>
+  <p class="lead">整条流水线只围着一个文件转:<code>project.json</code>。你可以把它想成“一张不断被填写的施工总表”。</p>
+  <p>第②步拆分镜时,大脑先把它<b>写成一张空白总表</b>:有多少场戏、每场几个镜头、每个镜头画什么、说什么、多长、什么情绪——但“画好的图”“生成的视频”这些格子先空着。后面每个工位干完活,就把自己的成果<b>填进对应的空格</b>:</p>
+  <div class="cb"><div class="cap">project.json 里一个“镜头”长这样(简化)</div>
+<pre>{
+  "id": "s01_sh01",              <span class="cmt">// 镜头编号:第1场第1个镜头</span>
+  "duration": 4.0,              <span class="cmt">// 时长(秒)</span>
+  "shot_size": "WS",           <span class="cmt">// 景别:远景</span>
+  "camera": "push_in",         <span class="cmt">// 运镜:缓慢推近</span>
+  "prompt_visual": "昏暗地下宫殿,金柱倒影...",  <span class="cmt">// 画面描述</span>
+  "narration": "这里……本不该存在。",           <span class="cmt">// 旁白</span>
+  "mood": "悬疑压抑",           <span class="cmt">// 情绪(决定配什么音乐)</span>
+
+  "keyframe": null,            <span class="cmt">// ← 第④步填:画好的图</span>
+  "clip": null,                <span class="cmt">// ← 第⑤步填:生成的视频</span>
+  "vo": null,                  <span class="cmt">// ← 第⑥步填:配音文件</span>
+  "status": "pending"          <span class="cmt">// 进度:等待中→排队→已生成→通过</span>
+}</pre>
+  <button class="copy">复制</button></div>
+  <div class="box tip"><b>为什么这样设计?</b>因为每个镜头都单独记着“做到哪一步了”。万一第 87 号镜头视频没生成好,系统只重做这一个,不用把整集重来。这就是流水线又快又稳的秘密。</div>
+
+  <!-- ⑧ -->
+  <h2 id="faq"><span class="n">8</span>常见问题 & 排错</h2>
+  <details><summary>Q:我完全没写过代码,能搭起来吗?</summary>
+    <p>能,但需要耐心。第 5 步的命令都是“复制粘贴回车”。真正需要动脑的是 n8n 里拖节点连线(第 5.6 步)和 SwarmUI 登记显卡(第 5.3 步)——这两块我可以给你更细的“保姆级”配置文件和图示。建议:<b>先只用 1~2 张卡把整条线跑通</b>,体验一遍全流程,再扩到 12 张卡。</p></details>
+  <details><summary>Q:视频生成看起来很“廉价”怎么办?</summary>
+    <p>三招提质量:①给主角训练专属形象(LoRA),全片不换脸;②每个镜头生成 3~4 个版本,自动挑最好的;③生成后用补帧+超分把画面美化到 1080P/60 帧。你的硬件很强,这些“奢侈操作”几乎不额外花时间。</p></details>
+  <details><summary>Q:某个软件起不来 / 网页打不开?</summary>
+    <p>按顺序查:①<code>docker ps</code> 看容器是不是在运行;②<code>docker logs 容器名</code> 看报错;③防火墙有没有放行端口(5678/8000/7801 等);④显卡类的看 <code>nvidia-smi</code> 卡在不在、有没有被别的进程占满显存。</p></details>
+  <details><summary>Q:一定要两台服务器都用上吗?</summary>
+    <p>不。可以先只用服务器 A 一台跑通所有环节(A 的卡够强,全包没问题)。等熟练了再把 B 接进来分担画图和配音,提升整体速度。</p></details>
+  <details><summary>Q:剧本拆分镜拆得不好怎么办?</summary>
+    <p>调第②步给大脑的“指令词”(prompt)和输出规则。把一段真实剧本喂进去看结果,不满意就细化要求(比如“每个镜头别超过 5 秒”“对白单独放一格”)。这是可以反复打磨的。</p></details>
+
+  <!-- ⑨ -->
+  <h2 id="glossary"><span class="n">9</span>名词对照表(看不懂就查这)</h2>
+  <div class="gl">
+    <div><span>Docker</span><span>绿色安装器。一条命令装好一个软件,互不干扰,删了也干净。</span></div>
+    <div><span>容器 container</span><span>用 Docker 装起来运行的一个软件实例,像一个独立小盒子。</span></div>
+    <div><span>n8n</span><span>可视化自动化工具。拖拖拽拽就能把多个软件串成一条自动流水线。</span></div>
+    <div><span>节点 node</span><span>n8n 流水线里的一个“步骤方块”,比如“调用一次某接口”。</span></div>
+    <div><span>Redis</span><span>超快的“临时记事本”,这里用来记每个镜头做到哪一步。</span></div>
+    <div><span>vLLM</span><span>跑大语言模型的高速引擎。这里当“大脑”读剧本、给成片挑毛病。</span></div>
+    <div><span>LLM / 大模型</span><span>会理解和生成文字的 AI,比如通义千问 Qwen。</span></div>
+    <div><span>VLM</span><span>“看得懂图”的大模型,用来检查生成的画面对不对。</span></div>
+    <div><span>ComfyUI</span><span>用“连线搭积木”的方式生成图片/视频的引擎。</span></div>
+    <div><span>SwarmUI</span><span>ComfyUI 的“总管”,能同时指挥很多张显卡、自动分配任务。</span></div>
+    <div><span>后端 backend</span><span>SwarmUI 眼里的一个“干活单元”,通常对应一张显卡。</span></div>
+    <div><span>关键帧 keyframe</span><span>一个镜头的“定格底图”,拿它去生成动起来的视频。</span></div>
+    <div><span>图生视频 I2V</span><span>Image-to-Video,把一张图变成一段带运动的视频。</span></div>
+    <div><span>LoRA</span><span>给 AI “记住某个角色长相/画风”的小补丁,保证全片一致。</span></div>
+    <div><span>TTS</span><span>Text-to-Speech,文字转语音,即“配音”。</span></div>
+    <div><span>Whisper</span><span>把语音转成文字/字幕并对齐时间的模型。</span></div>
+    <div><span>ffmpeg</span><span>万能音视频处理工具,这里当“剪辑师”拼接成片。</span></div>
+    <div><span>NFS</span><span>网络共享文件夹,让两台服务器看到同一份文件。</span></div>
+    <div><span>API / 接口</span><span>软件对外开的“服务窗口”,别的程序用一个网址就能调用它。</span></div>
+    <div><span>prompt</span><span>给 AI 的“指令词/描述”,比如画面要画什么、剧本怎么拆。</span></div>
+  </div>
+
+  <!-- ⑩ -->
+  <h2 id="checklist"><span class="n">10</span>搭建检查清单</h2>
+  <p class="lead">照着勾。勾选状态会自动保存在本浏览器,下次打开还在。</p>
+  <div class="check" id="checklist-box">
+    <label><input type="checkbox"><span>两台服务器都能跑 <code>nvidia-smi</code> 看到显卡</span></label>
+    <label><input type="checkbox"><span>Docker + NVIDIA Container Toolkit 装好</span></label>
+    <label><input type="checkbox"><span>服务器 A 起好 Redis + n8n,网页能打开 <code>:5678</code></span></label>
+    <label><input type="checkbox"><span>vLLM 起好,<code>curl :8000/v1/models</code> 有返回</span></label>
+    <label><input type="checkbox"><span>SwarmUI 起好,Generate 页能出图</span></label>
+    <label><input type="checkbox"><span>先登记 1~2 张卡,跑通再扩到 12 张</span></label>
+    <label><input type="checkbox"><span>配音/配乐/字幕三件套各自能被 curl 调出结果</span></label>
+    <label><input type="checkbox"><span>NFS 共享盘建好,两台机都能读写 <code>/media</code></span></label>
+    <label><input type="checkbox"><span>n8n 里建好 MAIN + 5 个子流程</span></label>
+    <label><input type="checkbox"><span>丢一小段剧本,能跑出第一部 mp4 成片 🎉</span></label>
+  </div>
+
+  <div class="foot">
+    <p>这份指南对应你的两台服务器(8×H100 + 4×5090)全本地方案。想更进一步,可以继续:</p>
+    <ul>
+      <li><b>C</b> — SwarmUI 逐卡登记的“保姆级”参数表(每张卡怎么绑)</li>
+      <li><b>能导入 n8n 的流水线文件</b> — 拖好的节点结构,导进去改地址即用</li>
+      <li><b>D</b> — 让全片“不换脸”的角色一致性做法(训 LoRA + prompt 拼接规则)</li>
+    </ul>
+    <p style="margin-top:16px;color:#5a6172">生成于 2026-07-01 · 全程本地 · 数据不出门 🔒</p>
+  </div>
+</main>
+</div>
+
+<script>
+  // 复制按钮
+  document.querySelectorAll('.cb .copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      var text = pre.innerText.replace(/​/g,'');
+      navigator.clipboard.writeText(text).then(function(){
+        var old = btn.textContent; btn.textContent = '已复制 ✓';
+        setTimeout(function(){ btn.textContent = old; }, 1400);
+      });
+    });
+  });
+  // 检查清单持久化
+  var boxes = document.querySelectorAll('#checklist-box input');
+  boxes.forEach(function(cb, i){
+    var key = 'film-pipeline-check-' + i;
+    if(localStorage.getItem(key) === '1') cb.checked = true;
+    cb.addEventListener('change', function(){
+      localStorage.setItem(key, cb.checked ? '1' : '0');
+    });
+  });
+</script>
+</body>
+</html>
