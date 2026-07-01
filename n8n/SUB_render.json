@@ -1,0 +1,230 @@
+{
+  "name": "影视流水线 · SUB_render 渲染心脏 (关键帧/视频通用)",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "project", "type": "string" },
+            { "name": "stage", "type": "string" }
+          ]
+        }
+      },
+      "id": "r-trigger",
+      "name": "开始 (接收 project + stage)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "=/media/{{ $json.project }}/project.json",
+        "options": {}
+      },
+      "id": "r-read",
+      "name": "读 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [-900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 把 project.json 摊平成「每个待渲染镜头一条」\nconst stage = $('开始 (接收 project + stage)').first().json.stage;\nconst proj = JSON.parse($input.first().binary.data ? Buffer.from($input.first().binary.data.data, 'base64').toString() : $input.first().json.data);\nconst out = [];\nfor (const sc of proj.scenes) {\n  for (const sh of sc.shots) {\n    // 只渲染还没做或上一轮失败的镜头\n    const need = stage === 'keyframe' ? !sh.keyframe : !sh.clip;\n    if (!need && sh.status !== 'failed') continue;\n    out.push({ json: {\n      project: proj.project, stage, aspect: proj.aspect,\n      style_global: proj.style_global,\n      shot_id: sh.id, duration: sh.duration,\n      shot_size: sh.shot_size, camera: sh.camera, angle: sh.angle,\n      prompt_visual: sh.prompt_visual,\n      keyframe_path: sh.keyframe,\n      swarm_session: proj.swarm_session\n    }});\n  }\n}\nreturn out;"
+      },
+      "id": "r-flatten",
+      "name": "展开镜头列表 (仅待渲染)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=job:{{ $('开始 (接收 project + stage)').first().json.project }}:{{ $('开始 (接收 project + stage)').first().json.stage }}:total",
+        "value": "={{ $items().length }}",
+        "keyType": "automatic"
+      },
+      "id": "r-settotal",
+      "name": "Redis: 记总数 total",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [-460, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "r-loop",
+      "name": "逐镜投递 (Split in Batches)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 按 stage 组装 SwarmUI 载荷:keyframe→Flux 文生图 / video→Wan 图生视频\nconst s = $json;\nconst isVideo = s.stage === 'video';\nconst prompt = `${s.prompt_visual}, ${s.style_global}, ${s.shot_size} shot, ${s.camera} camera`;\nreturn [{ json: {\n  session_id: s.swarm_session,\n  prompt,\n  model: isVideo ? 'wan2.2-i2v-14b' : 'flux1-dev',\n  initimage: isVideo ? s.keyframe_path : null,\n  images: 3,\n  aspectratio: s.aspect,\n  videoframes: isVideo ? Math.round(s.duration * 16) : 0,\n  images_folder: `/media/${s.project}/${s.stage}s/`,\n  shot_id: s.shot_id,\n  project: s.project,\n  stage: s.stage\n}}];"
+      },
+      "id": "r-payload",
+      "name": "组装 SwarmUI 载荷",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-20, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://SERVER_A:7801/API/GenerateText2Image",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "r-submit",
+      "name": "提交 SwarmUI 队列 (不阻塞)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 460]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=job:{{ $('组装 SwarmUI 载荷').item.json.project }}:{{ $('组装 SwarmUI 载荷').item.json.stage }}:{{ $('组装 SwarmUI 载荷').item.json.shot_id }}",
+        "value": "queued",
+        "keyType": "automatic"
+      },
+      "id": "r-mark",
+      "name": "Redis: 标记 queued",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [420, 460]
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "id": "r-wait",
+      "name": "等 15 秒",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [200, 140]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "done",
+        "key": "=job:{{ $('开始 (接收 project + stage)').first().json.project }}:{{ $('开始 (接收 project + stage)').first().json.stage }}:done",
+        "options": {}
+      },
+      "id": "r-getdone",
+      "name": "Redis: 读 done 计数",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [420, 140]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ Number($json.done) || 0 }}",
+              "rightValue": "={{ $items('Redis: 记总数 total').length }}",
+              "operator": { "type": "number", "operation": "lt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "r-if",
+      "name": "还没做完? (done < total)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 140]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "=/media/{{ $('开始 (接收 project + stage)').first().json.project }}/project.json",
+        "options": {}
+      },
+      "id": "r-reread",
+      "name": "重读 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [860, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 把 SwarmUI 产物路径回填到每个 shot,写回 project.json\nconst stage = $('开始 (接收 project + stage)').first().json.stage;\nconst proj = JSON.parse(Buffer.from($input.first().binary.data.data, 'base64').toString());\nfor (const sc of proj.scenes) {\n  for (const sh of sc.shots) {\n    const base = `/media/${proj.project}/${stage}s/${sh.id}`;\n    if (stage === 'keyframe') { sh.keyframe = `${base}_0.png`; sh.keyframe_candidates = [0,1,2].map(i=>`${base}_${i}.png`); }\n    else { sh.clip = `${base}.mp4`; }\n    sh.status = 'rendered';\n  }\n}\nreturn [{ json: proj, binary: { data: await this.helpers.prepareBinaryData(Buffer.from(JSON.stringify(proj, null, 2)), 'project.json', 'application/json') } }];"
+      },
+      "id": "r-fill",
+      "name": "回填产物路径",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 260]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/media/{{ $json.project }}/project.json",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "r-write",
+      "name": "写回 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [1300, 260]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_qc_ID",
+        "options": {}
+      },
+      "id": "r-qc",
+      "name": "逐镜质检 (SUB_qc)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1520, 260]
+    },
+    {
+      "parameters": {},
+      "id": "r-out",
+      "name": "返回 (本阶段完成)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1740, 260]
+    }
+  ],
+  "connections": {
+    "开始 (接收 project + stage)": { "main": [[{ "node": "读 project.json", "type": "main", "index": 0 }]] },
+    "读 project.json": { "main": [[{ "node": "展开镜头列表 (仅待渲染)", "type": "main", "index": 0 }]] },
+    "展开镜头列表 (仅待渲染)": { "main": [[{ "node": "Redis: 记总数 total", "type": "main", "index": 0 }]] },
+    "Redis: 记总数 total": { "main": [[{ "node": "逐镜投递 (Split in Batches)", "type": "main", "index": 0 }]] },
+    "逐镜投递 (Split in Batches)": { "main": [
+      [{ "node": "等 15 秒", "type": "main", "index": 0 }],
+      [{ "node": "组装 SwarmUI 载荷", "type": "main", "index": 0 }]
+    ] },
+    "组装 SwarmUI 载荷": { "main": [[{ "node": "提交 SwarmUI 队列 (不阻塞)", "type": "main", "index": 0 }]] },
+    "提交 SwarmUI 队列 (不阻塞)": { "main": [[{ "node": "Redis: 标记 queued", "type": "main", "index": 0 }]] },
+    "Redis: 标记 queued": { "main": [[{ "node": "逐镜投递 (Split in Batches)", "type": "main", "index": 0 }]] },
+    "等 15 秒": { "main": [[{ "node": "Redis: 读 done 计数", "type": "main", "index": 0 }]] },
+    "Redis: 读 done 计数": { "main": [[{ "node": "还没做完? (done < total)", "type": "main", "index": 0 }]] },
+    "还没做完? (done < total)": { "main": [
+      [{ "node": "等 15 秒", "type": "main", "index": 0 }],
+      [{ "node": "重读 project.json", "type": "main", "index": 0 }]
+    ] },
+    "重读 project.json": { "main": [[{ "node": "回填产物路径", "type": "main", "index": 0 }]] },
+    "回填产物路径": { "main": [[{ "node": "写回 project.json", "type": "main", "index": 0 }]] },
+    "写回 project.json": { "main": [[{ "node": "逐镜质检 (SUB_qc)", "type": "main", "index": 0 }]] },
+    "逐镜质检 (SUB_qc)": { "main": [[{ "node": "返回 (本阶段完成)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

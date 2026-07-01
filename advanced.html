@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进阶部署 · 12 卡逐卡配置 + n8n 流水线导入</title>
+<style>
+  :root{
+    --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;
+    --tx:#e8eaed;--tx2:#a8afbd;--tx3:#727a8a;
+    --acc:#e0793a;--acc2:#f0a868;--ok:#4ec98a;--warn:#e8b84b;--info:#5aa9e6;
+    --code:#12141a;--radius:14px;
+    --mono:'SFMono-Regular',ui-monospace,Consolas,'Cascadia Code',monospace;
+    --sans:-apple-system,'Segoe UI','Microsoft YaHei',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.75;font-size:16px}
+  a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px 120px}
+  .top{display:flex;align-items:center;gap:14px;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .top a.back{font-size:14px;color:var(--tx2)}
+  .top .sep{color:var(--tx3)}
+  .hero{background:linear-gradient(160deg,#1c2029,#141821);border:1px solid var(--line);border-radius:var(--radius);padding:34px 30px;margin:24px 0 32px}
+  .hero h1{margin:0 0 8px;font-size:27px}
+  .hero p{margin:0;color:var(--tx2)}
+  h2{font-size:22px;margin:48px 0 6px;padding-top:10px}
+  h2 .n{display:inline-block;padding:2px 12px;background:var(--acc);color:#fff;border-radius:8px;font-size:14px;margin-right:12px;vertical-align:3px}
+  h3{font-size:17px;margin:28px 0 8px;color:var(--acc2)}
+  .lead{color:var(--tx2);margin:4px 0 20px}
+  p{margin:12px 0}ul,ol{padding-left:22px}li{margin:6px 0}
+  code{font-family:var(--mono);background:var(--panel2);padding:2px 7px;border-radius:6px;font-size:13.5px;color:var(--acc2)}
+  .box{border-radius:12px;padding:15px 18px 15px 46px;margin:18px 0;position:relative;border:1px solid var(--line);font-size:14.5px;background:var(--panel)}
+  .box::before{position:absolute;left:16px;top:14px;font-size:18px}
+  .tip{border-color:#2e5a3f;background:#14201a}.tip::before{content:"💡"}
+  .warn{border-color:#5c4a1e;background:#211d12}.warn::before{content:"⚠️"}
+  .ok{border-color:#245544;background:#12201a}.ok::before{content:"✅"}
+  .info{border-color:#254a63;background:#121c24}.info::before{content:"ℹ️"}
+  .box b{color:var(--tx)}
+  .cb{position:relative;margin:16px 0}
+  .cb .cap{font-size:12px;color:var(--tx3);margin:0 0 6px}
+  .cb pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:#d4d8e0}
+  .cb .copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--tx2);border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+  .cb .copy:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .cmt{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--tx);font-weight:600}
+  td{color:var(--tx2)}td b{color:var(--tx)}
+  tr:nth-child(even) td{background:#14171d}
+  .tagV{color:#f0a868}.tagI{color:#5aa9e6}.tagL{color:#4ec98a}.tagA{color:#c98ae0}
+  .dl{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+  .dl a{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 20px;min-width:240px}
+  .dl a:hover{border-color:var(--acc);text-decoration:none}
+  .dl a .f{font-weight:600;color:var(--tx);font-family:var(--mono);font-size:14px}
+  .dl a .s{font-size:12.5px;color:var(--tx2)}
+  .dl a .g{font-size:12px;color:var(--acc2);margin-top:4px}
+  .step{border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0;background:var(--panel)}
+  .step .st-h{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .step .st-n{background:var(--acc);color:#fff;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .step .st-h h3{margin:0;color:var(--tx);font-size:16px}
+  details{border:1px solid var(--line);border-radius:12px;padding:0 18px;margin:14px 0;background:var(--panel)}
+  details summary{cursor:pointer;padding:14px 0;font-weight:600;color:var(--acc2)}
+  details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+  .foot{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="back" href="index.html">← 返回主指南</a>
+    <span class="sep">/</span>
+    <span style="color:var(--tx2);font-size:14px">进阶部署</span>
+  </div>
+
+  <div class="hero">
+    <h1>进阶部署:12 卡逐卡配置 + n8n 流水线导入</h1>
+    <p>把 12 张显卡一张张登记进画面工厂,再把搭好的流水线一键导进 n8n。这是主指南第 5.3 / 5.6 步的“保姆级”细化版。</p>
+  </div>
+
+  <!-- ===== C ===== -->
+  <h2 id="c"><span class="n">C</span>SwarmUI 12 卡逐卡登记参数表</h2>
+  <p class="lead">核心原则:<b>一张卡 = 一个后端 = 一个独立进程</b>,用 <code>CUDA_VISIBLE_DEVICES</code> 把进程钉死在指定卡上,再登记进 SwarmUI。SwarmUI 之后会自动把任务派给空闲后端。</p>
+
+  <h3>舰队总表(照着这张表配)</h3>
+  <table>
+    <tr><th>机器</th><th>物理卡号</th><th>角色</th><th>跑什么进程</th><th>绑定方式</th><th>端口</th><th>登记进 SwarmUI?</th></tr>
+    <tr><td rowspan="8"><b>A<br>8×H100</b></td><td>GPU 0</td><td class="tagL">大脑</td><td>vLLM(与 GPU1 合跑一个大模型)</td><td>--gpus device=0,1</td><td>8000</td><td>否</td></tr>
+    <tr><td>GPU 1</td><td class="tagL">大脑</td><td>vLLM(同上)</td><td>同上</td><td>8000</td><td>否</td></tr>
+    <tr><td>GPU 2</td><td class="tagV">视频</td><td>ComfyUI 后端 A1</td><td>CUDA_VISIBLE_DEVICES=2</td><td>8188</td><td><b>是</b></td></tr>
+    <tr><td>GPU 3</td><td class="tagV">视频</td><td>ComfyUI 后端 A2</td><td>CUDA_VISIBLE_DEVICES=3</td><td>8189</td><td><b>是</b></td></tr>
+    <tr><td>GPU 4</td><td class="tagV">视频</td><td>ComfyUI 后端 A3</td><td>CUDA_VISIBLE_DEVICES=4</td><td>8190</td><td><b>是</b></td></tr>
+    <tr><td>GPU 5</td><td class="tagV">视频</td><td>ComfyUI 后端 A4</td><td>CUDA_VISIBLE_DEVICES=5</td><td>8191</td><td><b>是</b></td></tr>
+    <tr><td>GPU 6</td><td class="tagV">视频</td><td>ComfyUI 后端 A5</td><td>CUDA_VISIBLE_DEVICES=6</td><td>8192</td><td><b>是</b></td></tr>
+    <tr><td>GPU 7</td><td class="tagV">视频</td><td>ComfyUI 后端 A6</td><td>CUDA_VISIBLE_DEVICES=7</td><td>8193</td><td><b>是</b></td></tr>
+    <tr><td rowspan="4"><b>B<br>4×5090</b></td><td>GPU 0</td><td class="tagI">出图</td><td>ComfyUI 后端 B1</td><td>CUDA_VISIBLE_DEVICES=0</td><td>8188</td><td><b>是</b>(远程)</td></tr>
+    <tr><td>GPU 1</td><td class="tagI">出图</td><td>ComfyUI 后端 B2</td><td>CUDA_VISIBLE_DEVICES=1</td><td>8189</td><td><b>是</b>(远程)</td></tr>
+    <tr><td>GPU 2</td><td class="tagI">出图</td><td>ComfyUI 后端 B3</td><td>CUDA_VISIBLE_DEVICES=2</td><td>8190</td><td><b>是</b>(远程)</td></tr>
+    <tr><td>GPU 3</td><td class="tagA">音频</td><td>IndexTTS + ACE-Step + Whisper</td><td>CUDA_VISIBLE_DEVICES=3</td><td>9880…</td><td>否</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--tx3)"><span class="tagL">■</span> 大脑(vLLM) &nbsp; <span class="tagV">■</span> 视频(H100) &nbsp; <span class="tagI">■</span> 出图(5090) &nbsp; <span class="tagA">■</span> 音频。SwarmUI 实际管 9 个后端(A 的 6 + B 的 3)。</p>
+
+  <h3>第 1 步:在 A 上拉起 6 个视频后端</h3>
+  <div class="cb"><div class="cap">服务器 A 终端 · 6 张 H100 各起一个 ComfyUI(在 ComfyUI 目录下)</div>
+<pre>for i in 2 3 4 5 6 7; do
+  port=$((8186 + i))                       <span class="cmt"># GPU2→8188 … GPU7→8193</span>
+  CUDA_VISIBLE_DEVICES=$i python main.py \
+    --listen 0.0.0.0 --port $port \
+    --output-directory /media &            <span class="cmt"># 产物落共享盘</span>
+done</pre>
+  <button class="copy">复制</button></div>
+
+  <h3>第 2 步:在 B 上拉起 3 个出图后端</h3>
+  <div class="cb"><div class="cap">服务器 B 终端 · 3 张 5090 各起一个 ComfyUI</div>
+<pre>for i in 0 1 2; do
+  port=$((8188 + i))                       <span class="cmt"># GPU0→8188 GPU1→8189 GPU2→8190</span>
+  CUDA_VISIBLE_DEVICES=$i python main.py \
+    --listen 0.0.0.0 --port $port \
+    --output-directory /media &
+done</pre>
+  <button class="copy">复制</button></div>
+
+  <h3>第 3 步:在 SwarmUI 里把这 9 个登记为后端</h3>
+  <p>打开 <code>http://SERVER_A:7801</code> → <b>Server → Backends → Add Backend</b>,类型选 <b>“ComfyUI API By URL”</b>,逐个填地址:</p>
+  <table>
+    <tr><th>后端名</th><th>Address 填这个</th></tr>
+    <tr><td>A1…A6</td><td><code>http://127.0.0.1:8188</code> … <code>:8193</code>(A 本机 6 个)</td></tr>
+    <tr><td>B1…B3</td><td><code>http://SERVER_B:8188</code> … <code>:8190</code>(← 改成 B 的 IP)</td></tr>
+  </table>
+  <div class="box tip"><b>模型放置 = 自动分流(关键技巧)。</b>把<b>视频模型(Wan2.2)只放在 A 的 ComfyUI 模型目录</b>,把<b>出图模型(Flux)只放在 B 的模型目录</b>。这样“要 Wan 的任务”只能落到有 Wan 的 A 后端、“要 Flux 的任务”只能落到 B 后端——不用额外配路由,靠模型文件位置天然把视频钉在 H100、出图钉在 5090。</div>
+
+  <h3>第 4 步:验证每张卡都在干活</h3>
+  <div class="cb"><div class="cap">分别在 A、B 上执行</div>
+<pre>nvidia-smi     <span class="cmt"># A 上应看到 GPU0/1 被 vLLM 占,GPU2~7 各一个 python(ComfyUI)</span>
+               <span class="cmt"># B 上应看到 GPU0/1/2 各一个 python,GPU3 被音频进程占</span></pre>
+  <button class="copy">复制</button></div>
+  <div class="box ok"><b>怎么算成功:</b>SwarmUI 的 Backends 页 9 个后端全绿;Generate 页出图/生成视频都能出结果。<b>每个后端一次只跑一个任务,9 个后端 = 9 个镜头同时渲染</b>,其余排队。</div>
+
+  <details><summary>更省事的替代法:SwarmUI 自启动后端(单机适用)</summary>
+    <p>如果只用服务器 A,可以不手动起 ComfyUI:在 SwarmUI 里加 <b>“ComfyUI Self-Starting”</b> 后端,每个后端的设置里把 <code>GPU_ID</code> 填 2、3、4…由 SwarmUI 自己拉起进程并钉卡。跨机器(B)时仍建议用上面的“ComfyUI API By URL”远程登记法,更透明可控。</p></details>
+
+  <!-- ===== n8n ===== -->
+  <h2 id="n8n"><span class="n">n8n</span>导入可直接跑的流水线</h2>
+  <p class="lead">下面两个文件是搭好的 n8n 工作流。下载 → 在 n8n 里导入 → 改几处地址就能跑,不用从零拖节点。</p>
+
+  <div class="dl">
+    <a href="n8n/MAIN.json" download>
+      <span class="f">MAIN.json</span>
+      <span class="s">主流程:①触发→②拆分镜→审核→④⑤渲染→⑥⑦音频→⑧合成→⑨通知</span>
+      <span class="g">10 个节点 · 总调度</span>
+    </a>
+    <a href="n8n/SUB_render.json" download>
+      <span class="f">SUB_render.json</span>
+      <span class="s">渲染心脏:一次性投递全部镜头 → 轮询做完几个 → 全好再继续</span>
+      <span class="g">16 个节点 · 关键帧/视频通用</span>
+    </a>
+  </div>
+
+  <div class="step">
+    <div class="st-h"><div class="st-n">1</div><h3>导入</h3></div>
+    <p>n8n 右上角 <b>⋯ → Import from File</b>,分别导入这两个 JSON。先导 <code>SUB_render</code>,再导 <code>MAIN</code>。</p>
+  </div>
+  <div class="step">
+    <div class="st-h"><div class="st-n">2</div><h3>接上凭据 & 地址</h3></div>
+    <ul>
+      <li><b>Redis 节点</b>:点任意 Redis 节点 → Credential → 填 <code>SERVER_A:6379</code>。</li>
+      <li><b>HTTP 节点</b>:把 <code>SERVER_A:7801</code>(SwarmUI)、<code>ntfy</code> 通知地址改成你的真实 IP/端口。</li>
+      <li><b>文件节点</b>:确认路径都是共享盘 <code>/media/...</code>(n8n 容器要挂到同一个 <code>/media</code>)。</li>
+    </ul>
+  </div>
+  <div class="step">
+    <div class="st-h"><div class="st-n">3</div><h3>把子流程 ID 填回 MAIN</h3></div>
+    <p>MAIN 里那几个 <b>Execute Workflow</b> 节点,当前写着 <code>REPLACE_SUB_render_ID</code> 之类占位符。点开每个节点,在下拉里选中你导入的对应子流程即可(SUB_parse / SUB_render / SUB_audio / SUB_assemble / SUB_qc)。</p>
+    <div class="box info">本次只给了 MAIN 和 SUB_render 两个;<code>SUB_parse / SUB_audio / SUB_assemble / SUB_qc</code> 结构更简单(基本就是几个 HTTP + Code 节点),可以照 SUB_render 的样子自己搭,或让我下一步一并补上。</div>
+  </div>
+
+  <h3>SUB_render 的运转逻辑(导入后你会看到)</h3>
+  <ul>
+    <li><b>展开镜头列表</b>:读 <code>project.json</code>,摊平成“每个待渲染镜头一条”,已完成的自动跳过。</li>
+    <li><b>逐镜投递</b>:把每个镜头组装成 SwarmUI 载荷 POST 出去,<b>只投递、不等结果</b>——9 个后端在背后并行抽干。</li>
+    <li><b>轮询循环</b>:每 15 秒查一次 Redis 的 <code>done</code> 计数,没做完就继续等,全做完才往下走。</li>
+    <li><b>回填 + 质检</b>:把产物路径写回 <code>project.json</code>,交给 <code>SUB_qc</code> 逐镜打分,不合格的标 <code>failed</code>、下一轮只重做它。</li>
+  </ul>
+  <div class="box warn"><b>导入后请自查两处</b>:①Code 节点里的读写用的是 <code>readWriteFile</code> 节点,确认 n8n 有权限访问 <code>/media</code>;②<code>done</code> 计数由“ComfyUI 完成回调”写入 Redis 最稳——生产环境建议给每个后端配一个产物落盘后 <code>INCR</code> 的回调,而不是靠 n8n 猜。</div>
+
+  <div class="foot">
+    <p>← <a href="index.html">返回主指南</a> · 想让我补齐 <code>SUB_parse / SUB_audio / SUB_assemble / SUB_qc</code> 四个子流程,或加上角色一致性(LoRA)方案(D),随时说。</p>
+    <p style="margin-top:12px;color:#5a6172">全程本地 · 数据不出门 🔒</p>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.cb .copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var old = btn.textContent; btn.textContent = '已复制 ✓';
+        setTimeout(function(){ btn.textContent = old; }, 1400);
+      });
+    });
+  });
+</script>
+</body>
+</html>

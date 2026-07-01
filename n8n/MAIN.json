@@ -1,0 +1,147 @@
+{
+  "name": "影视流水线 · MAIN 主流程",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "film-pipeline",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "① 剧本触发 (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-960, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "project", "type": "string", "value": "={{ $json.body.project }}" },
+            { "id": "a2", "name": "aspect", "type": "string", "value": "={{ $json.body.aspect || '16:9' }}" },
+            { "id": "a3", "name": "script_path", "type": "string", "value": "={{ $json.body.script_path }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-init",
+      "name": "初始化 project 变量",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-740, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_parse_ID",
+        "options": {}
+      },
+      "id": "node-parse",
+      "name": "② 拆分镜 (SUB_parse)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-520, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "node-review1",
+      "name": "人工审核·分镜 (暂停等确认)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-300, 300],
+      "webhookId": "review-storyboard"
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_render_ID",
+        "workflowInputs": {
+          "value": { "project": "={{ $json.project }}", "stage": "keyframe" }
+        },
+        "options": {}
+      },
+      "id": "node-keyframe",
+      "name": "④ 关键帧 (SUB_render · keyframe)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-80, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_render_ID",
+        "workflowInputs": {
+          "value": { "project": "={{ $json.project }}", "stage": "video" }
+        },
+        "options": {}
+      },
+      "id": "node-video",
+      "name": "⑤ 图生视频 (SUB_render · video)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [180, 180]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_audio_ID",
+        "options": {}
+      },
+      "id": "node-audio",
+      "name": "⑥⑦ 配音+配乐 (SUB_audio · 并行)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [180, 420]
+    },
+    {
+      "parameters": {},
+      "id": "node-merge",
+      "name": "汇合 视频+音频",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_SUB_assemble_ID",
+        "options": {}
+      },
+      "id": "node-assemble",
+      "name": "⑧ 字幕+ffmpeg 合成 (SUB_assemble)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://SERVER_A:PORT/ntfy_topic",
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=成片就绪 ✅ /media/{{ $json.project }}/out/final.mp4",
+        "options": {}
+      },
+      "id": "node-notify",
+      "name": "⑨ 通知成片就绪 (ntfy)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 300]
+    }
+  ],
+  "connections": {
+    "① 剧本触发 (Webhook)": { "main": [[{ "node": "初始化 project 变量", "type": "main", "index": 0 }]] },
+    "初始化 project 变量": { "main": [[{ "node": "② 拆分镜 (SUB_parse)", "type": "main", "index": 0 }]] },
+    "② 拆分镜 (SUB_parse)": { "main": [[{ "node": "人工审核·分镜 (暂停等确认)", "type": "main", "index": 0 }]] },
+    "人工审核·分镜 (暂停等确认)": { "main": [[{ "node": "④ 关键帧 (SUB_render · keyframe)", "type": "main", "index": 0 }]] },
+    "④ 关键帧 (SUB_render · keyframe)": { "main": [[
+      { "node": "⑤ 图生视频 (SUB_render · video)", "type": "main", "index": 0 },
+      { "node": "⑥⑦ 配音+配乐 (SUB_audio · 并行)", "type": "main", "index": 0 }
+    ]] },
+    "⑤ 图生视频 (SUB_render · video)": { "main": [[{ "node": "汇合 视频+音频", "type": "main", "index": 0 }]] },
+    "⑥⑦ 配音+配乐 (SUB_audio · 并行)": { "main": [[{ "node": "汇合 视频+音频", "type": "main", "index": 1 }]] },
+    "汇合 视频+音频": { "main": [[{ "node": "⑧ 字幕+ffmpeg 合成 (SUB_assemble)", "type": "main", "index": 0 }]] },
+    "⑧ 字幕+ffmpeg 合成 (SUB_assemble)": { "main": [[{ "node": "⑨ 通知成片就绪 (ntfy)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}
