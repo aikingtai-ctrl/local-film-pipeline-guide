@@ -1,0 +1,118 @@
+{
+  "name": "影视流水线 · SUB_script 小说→剧本 (Claude Code / vLLM 可切换)",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "project", "type": "string" },
+            { "name": "engine", "type": "string" },
+            { "name": "resume", "type": "string" }
+          ]
+        }
+      },
+      "id": "s-trigger",
+      "name": "开始 (project + engine + resume)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "eng",
+              "leftValue": "={{ ($json.engine || 'claude').toLowerCase() }}",
+              "rightValue": "claude",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "s-if",
+      "name": "引擎? claude 还是 vllm",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-760, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://B_HOST_IP:8787/agent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  prompt: `读 /media/${$json.project}/novel.txt,改编成横屏精品短剧剧本,按我的短剧改编方法论保留关键反转,写到 /media/${$json.project}/screenplay.md`,\n  cwd: `/media/${$json.project}`,\n  allowedTools: ['Read','Write'],\n  resume: $json.resume || undefined,\n  systemAppend: '你是资深短剧编剧,遵循用户 documentary-director 技能与项目记忆里的创作范式。'\n}) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "s-claude",
+      "name": "🧠 Claude Code (bridge)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-520, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://A_HOST_IP:8000/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'Qwen2.5-72B-Instruct',\n  messages: [\n    { role:'system', content:'你是资深短剧编剧,把小说改编成横屏精品短剧剧本。' },\n    { role:'user', content: $json.novel_text }\n  ],\n  temperature: 0.6\n}) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "s-vllm",
+      "name": "本地 vLLM (全本地备选)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-520, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 统一两种引擎的输出:都归一成 { screenplay, session_id }\nconst j = $json;\nlet screenplay = '';\nlet session_id = null;\nif (j.result !== undefined) {           // 来自 Claude bridge\n  screenplay = j.result;\n  session_id = j.session_id || null;\n} else if (j.choices) {                  // 来自 vLLM\n  screenplay = j.choices[0].message.content;\n}\nreturn [{ json: {\n  project: $('开始 (project + engine + resume)').first().json.project,\n  screenplay, session_id\n}}];"
+      },
+      "id": "s-norm",
+      "name": "归一化输出",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-260, 300]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/media/{{ $json.project }}/screenplay.md",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "s-write",
+      "name": "写 screenplay.md",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [-20, 300]
+    },
+    {
+      "parameters": {},
+      "id": "s-out",
+      "name": "返回 (剧本就绪 + session_id)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [220, 300]
+    }
+  ],
+  "connections": {
+    "开始 (project + engine + resume)": { "main": [[{ "node": "引擎? claude 还是 vllm", "type": "main", "index": 0 }]] },
+    "引擎? claude 还是 vllm": { "main": [
+      [{ "node": "🧠 Claude Code (bridge)", "type": "main", "index": 0 }],
+      [{ "node": "本地 vLLM (全本地备选)", "type": "main", "index": 0 }]
+    ] },
+    "🧠 Claude Code (bridge)": { "main": [[{ "node": "归一化输出", "type": "main", "index": 0 }]] },
+    "本地 vLLM (全本地备选)": { "main": [[{ "node": "归一化输出", "type": "main", "index": 0 }]] },
+    "归一化输出": { "main": [[{ "node": "写 screenplay.md", "type": "main", "index": 0 }]] },
+    "写 screenplay.md": { "main": [[{ "node": "返回 (剧本就绪 + session_id)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

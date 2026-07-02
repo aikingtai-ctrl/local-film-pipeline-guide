@@ -405,8 +405,11 @@ sudo mount 服务器A的IP:/media /media       <span class="cmt"># ← 改这里
 
   <div class="foot">
     <p>这份指南对应你的两台服务器(8×H100 + 4×5090)全本地方案。</p>
-    <p style="margin:14px 0"><a href="advanced.html" style="display:inline-block;background:#e0793a;color:#fff;padding:11px 22px;border-radius:10px;font-weight:600;text-decoration:none">👉 进阶部署:12 卡逐卡配置 + n8n 流水线导入 →</a></p>
-    <p style="color:#a8afbd">进阶页含:每张显卡怎么绑定登记(C 逐卡参数表)、可直接导入 n8n 的流水线 JSON 下载(MAIN + SUB_render)。还想要角色一致性(LoRA)方案(D)随时说。</p>
+    <p style="margin:14px 0;display:flex;gap:12px;flex-wrap:wrap">
+      <a href="advanced.html" style="display:inline-block;background:#e0793a;color:#fff;padding:11px 22px;border-radius:10px;font-weight:600;text-decoration:none">👉 进阶部署:12 卡配置 + n8n 导入 →</a>
+      <a href="novel-to-cut.html" style="display:inline-block;background:#1e222b;border:1px solid #e0793a;color:#f0a868;padding:11px 22px;border-radius:10px;font-weight:600;text-decoration:none">🧠 小说→粗剪 + Claude Code 集成 →</a>
+    </p>
+    <p style="color:#a8afbd">进阶页:每张显卡怎么绑定登记(C 逐卡参数表)、可导入的 n8n 流水线 JSON(MAIN + SUB_render)。<br>Claude Code 页:n8n 只在 5090 也够用、小说自动改编到粗剪、把 Claude Code 当 AI 编剧/导演接入(含 bridge 服务下载)。</p>
     <p style="margin-top:16px;color:#5a6172">生成于 2026-07-01 · 全程本地 · 数据不出门 🔒</p>
   </div>
 </main>

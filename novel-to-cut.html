@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小说 → 成片粗剪 + 把 Claude Code 装进 n8n</title>
+<style>
+  :root{
+    --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;
+    --tx:#e8eaed;--tx2:#a8afbd;--tx3:#727a8a;
+    --acc:#e0793a;--acc2:#f0a868;--ok:#4ec98a;--warn:#e8b84b;--info:#5aa9e6;--cloud:#c98ae0;
+    --code:#12141a;--radius:14px;
+    --mono:'SFMono-Regular',ui-monospace,Consolas,'Cascadia Code',monospace;
+    --sans:-apple-system,'Segoe UI','Microsoft YaHei',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.75;font-size:16px}
+  a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px 120px}
+  .top{display:flex;align-items:center;gap:14px;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px;flex-wrap:wrap}
+  .top a.back{font-size:14px;color:var(--tx2)}.top .sep{color:var(--tx3)}
+  .hero{background:linear-gradient(160deg,#1c2029,#141821);border:1px solid var(--line);border-radius:var(--radius);padding:34px 30px;margin:24px 0 32px}
+  .hero h1{margin:0 0 8px;font-size:26px;line-height:1.3}
+  .hero p{margin:0;color:var(--tx2)}
+  h2{font-size:22px;margin:48px 0 6px;padding-top:10px}
+  h2 .n{display:inline-block;padding:2px 12px;background:var(--acc);color:#fff;border-radius:8px;font-size:14px;margin-right:12px;vertical-align:3px}
+  h3{font-size:17px;margin:28px 0 8px;color:var(--acc2)}
+  .lead{color:var(--tx2);margin:4px 0 20px}
+  p{margin:12px 0}ul,ol{padding-left:22px}li{margin:6px 0}
+  code{font-family:var(--mono);background:var(--panel2);padding:2px 7px;border-radius:6px;font-size:13.5px;color:var(--acc2)}
+  .box{border-radius:12px;padding:15px 18px 15px 46px;margin:18px 0;position:relative;border:1px solid var(--line);font-size:14.5px;background:var(--panel)}
+  .box::before{position:absolute;left:16px;top:14px;font-size:18px}
+  .tip{border-color:#2e5a3f;background:#14201a}.tip::before{content:"💡"}
+  .warn{border-color:#5c4a1e;background:#211d12}.warn::before{content:"⚠️"}
+  .ok{border-color:#245544;background:#12201a}.ok::before{content:"✅"}
+  .info{border-color:#254a63;background:#121c24}.info::before{content:"ℹ️"}
+  .cloud{border-color:#503a63;background:#1b1424}.cloud::before{content:"☁️"}
+  .box b{color:var(--tx)}
+  .cb{position:relative;margin:16px 0}
+  .cb .cap{font-size:12px;color:var(--tx3);margin:0 0 6px}
+  .cb pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:#d4d8e0}
+  .cb .copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--tx2);border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+  .cb .copy:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .cmt{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--tx);font-weight:600}
+  td{color:var(--tx2)}td b{color:var(--tx)}
+  tr:nth-child(even) td{background:#14171d}
+  .cloudtag{color:var(--cloud);font-weight:600}.localtag{color:var(--ok);font-weight:600}
+  .dl{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+  .dl a{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 20px;min-width:220px}
+  .dl a:hover{border-color:var(--acc);text-decoration:none}
+  .dl a .f{font-weight:600;color:var(--tx);font-family:var(--mono);font-size:14px}
+  .dl a .s{font-size:12.5px;color:var(--tx2)}
+  .step{border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0;background:var(--panel)}
+  .step .st-h{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .step .st-n{background:var(--acc);color:#fff;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .step .st-h h3{margin:0;color:var(--tx);font-size:16px}
+  details{border:1px solid var(--line);border-radius:12px;padding:0 18px;margin:14px 0;background:var(--panel)}
+  details summary{cursor:pointer;padding:14px 0;font-weight:600;color:var(--acc2)}
+  details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+  .foot{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="back" href="index.html">← 主指南</a><span class="sep">/</span>
+    <a class="back" href="advanced.html">进阶部署</a><span class="sep">/</span>
+    <span style="color:var(--tx2);font-size:14px">小说→粗剪 + Claude Code</span>
+  </div>
+
+  <div class="hero">
+    <h1>小说 → 成片粗剪,并把 Claude Code 装进 n8n</h1>
+    <p>n8n 只装在 5090 服务器上也完全够用。本页教你搭一条「小说自动改编→分镜→生成→粗剪」的流水线,并让 Claude Code 作为“AI 编剧/导演”接入其中。</p>
+  </div>
+
+  <!-- 拓扑 -->
+  <h2 id="topo"><span class="n">0</span>先说清:n8n 在 5090 上,够用</h2>
+  <p class="lead">n8n 是“指挥官”不是“劳工”,自己几乎不吃资源,活儿全靠网络调别的服务。它在哪台机器无所谓。</p>
+  <table>
+    <tr><th>n8n 调用谁</th><th>在哪</th><th>怎么调</th></tr>
+    <tr><td>出图 / 配音 / 配乐 / 字幕 / ffmpeg 剪辑</td><td><b>B 本地</b></td><td><code>http://localhost:端口</code></td></tr>
+    <tr><td>视频生成(6×H100)、vLLM 大模型</td><td><b>A 远程</b></td><td><code>http://A的IP:端口</code></td></tr>
+    <tr><td>🧠 Claude Code(创作大脑)</td><td>B 宿主机</td><td><code>http://B宿主机IP:8787</code></td></tr>
+  </table>
+  <div class="box ok">前提只有两条:两台机器网络互通 + 共享同一个 <code>/media</code>(NFS)。<b>你现在就能开工,不用等 A 上也装 n8n。</b></div>
+
+  <!-- 工作流 -->
+  <h2 id="flow"><span class="n">1</span>工作流:小说 → 成片粗剪(10 步)</h2>
+  <p class="lead">注意每步是 <span class="cloudtag">☁️ 云端 Claude Code</span> 还是 <span class="localtag">🖥️ 本地模型</span>、跑在 A 还是 B。</p>
+  <table>
+    <tr><th>#</th><th>阶段</th><th>谁来做</th><th>位置</th></tr>
+    <tr><td>0</td><td>小说输入(.txt 丢进 inbox)</td><td>n8n 监听</td><td>B</td></tr>
+    <tr><td>1</td><td><b>小说 → 剧本改编</b></td><td class="cloudtag">☁️ Claude Code</td><td>云</td></tr>
+    <tr><td>2</td><td><b>剧本 → 分镜 project.json</b></td><td class="cloudtag">☁️ Claude Code</td><td>云</td></tr>
+    <tr><td>3</td><td>角色 / 场景设定图</td><td class="localtag">ComfyUI</td><td>B(5090)</td></tr>
+    <tr><td>4</td><td>关键帧(逐镜)</td><td class="localtag">ComfyUI</td><td>B(5090)</td></tr>
+    <tr><td>5</td><td>图生视频(逐镜)</td><td class="localtag">Wan2.2</td><td><b>A(H100)</b></td></tr>
+    <tr><td>6</td><td>配音 / 旁白</td><td class="localtag">IndexTTS</td><td>B</td></tr>
+    <tr><td>7</td><td>配乐 / 音效</td><td class="localtag">ACE-Step</td><td>B</td></tr>
+    <tr><td>8</td><td>字幕对齐</td><td class="localtag">Whisper</td><td>B</td></tr>
+    <tr><td>9</td><td><b>粗剪合成</b>(按序拼片+配音+粗 BGM+烧字幕)</td><td class="localtag">ffmpeg</td><td>B</td></tr>
+    <tr><td>10</td><td><b>粗剪质检复核</b>(挑问题镜头→重做清单)</td><td class="cloudtag">☁️ Claude Code</td><td>云</td></tr>
+  </table>
+  <div class="box tip"><b>“粗剪”= 能判断故事成不成立的样片。</b>第 9 步不做精细调色/转场,只按剧本顺序拼片、配人声+背景乐、烧字幕,输出 <code>rough_cut.mp4</code>。精修留人工——自动化最该产出的就是这个粗样片。</div>
+
+  <!-- 为什么用 Claude Code -->
+  <h2 id="why"><span class="n">2</span>Claude Code 的价值(不是花瓶)</h2>
+  <p>关键:<b>它不是“又一个 LLM 调用”,而是一个能用你的技能与记忆、能读写文件的智能体。</b>所以让它负责 3 个高含金量环节:</p>
+  <ul>
+    <li><b>第 1 步 小说→剧本</b>:读整本小说、调用你的 <code>documentary-director</code> 技能与项目记忆(《锦衣少年行》《故宫之下》设定),写出成篇剧本——本地 vLLM 单次调用做不到这种“长上下文+专属范式+系列连续性”。</li>
+    <li><b>第 2 步 分镜</b>:按导演手法切成带景别/运镜/情绪的镜头表。</li>
+    <li><b>第 10 步 质检</b>:读 <code>project.json</code>+质检报告,像导演一样判断哪个镜头不对、为什么、怎么重拍。</li>
+  </ul>
+  <div class="box cloud"><b>诚实提醒:Claude Code 走 Anthropic 云 API,不是本地模型。</b>上云的只有<b>文本</b>(小说、剧本、分镜描述、质检意见);所有<b>画面/视频/声音/成片永远在你服务器上</b>。若小说文本不能外传,第 1/2/10 步改用本地 vLLM(下面的子流程支持一键切换)。</div>
+
+  <!-- 集成 -->
+  <h2 id="int"><span class="n">3</span>把 Claude Code 装进 n8n</h2>
+  <p class="lead">推荐:claude-bridge 微服务跑在 <b>B 宿主机(非 Docker)</b>,n8n 从容器里用 HTTP 调它。这样 Claude Code 原生加载你 <code>~/.claude</code> 里的技能和记忆。</p>
+
+  <div class="dl">
+    <a href="claude-bridge/claude-bridge.mjs" download><span class="f">claude-bridge.mjs</span><span class="s">Agent SDK 封装的 HTTP 服务</span></a>
+    <a href="claude-bridge/package.json" download><span class="f">package.json</span><span class="s">依赖清单</span></a>
+    <a href="claude-bridge/README.md" download><span class="f">README.md</span><span class="s">安装启动说明</span></a>
+    <a href="n8n/SUB_script.json" download><span class="f">SUB_script.json</span><span class="s">小说→剧本 · Claude/vLLM 可切换</span></a>
+  </div>
+
+  <div class="step">
+    <div class="st-h"><div class="st-n">1</div><h3>配认证(在 B 宿主机)</h3></div>
+    <div class="cb"><div class="cap">从 platform.claude.com 获取 key,写进 ~/.bashrc</div>
+<pre>export ANTHROPIC_API_KEY="sk-ant-..."</pre><button class="copy">复制</button></div>
+  </div>
+
+  <div class="step">
+    <div class="st-h"><div class="st-n">2</div><h3>装并启动 bridge</h3></div>
+    <div class="cb"><div class="cap">下载上面三个文件到同一目录,然后</div>
+<pre>npm install
+npm i -g pm2
+pm2 start claude-bridge.mjs && pm2 save
+
+<span class="cmt"># 冒烟测试:应返回 result + session_id</span>
+curl -X POST localhost:8787/agent -H 'content-type: application/json' \
+  -d '{"prompt":"说你好并列出你能看到的技能"}'</pre><button class="copy">复制</button></div>
+    <div class="box ok"><b>成功标志:</b>返回的 <code>result</code> 里能提到你的 <code>documentary-director</code> 技能,说明技能+记忆已加载。</div>
+  </div>
+
+  <div class="step">
+    <div class="st-h"><div class="st-n">3</div><h3>n8n 里调用</h3></div>
+    <p>HTTP Request 节点 → POST <code>http://B宿主机IP:8787/agent</code>,body 传任务;响应里 <code>result</code> 是产出、<code>session_id</code> 存起来给下一集续接。三个创作环节的 body 示例:</p>
+    <div class="cb"><div class="cap">① 小说 → 剧本</div>
+<pre>{
+  "prompt": "读 /media/proj01/novel.txt,改编成横屏精品短剧剧本,写到 screenplay.md。保留关键反转。",
+  "cwd": "/media/proj01",
+  "allowedTools": ["Read","Write"],
+  "systemAppend": "你是资深短剧编剧,遵循用户创作范式。"
+}</pre><button class="copy">复制</button></div>
+    <div class="cb"><div class="cap">③ 粗剪质检复核</div>
+<pre>{
+  "prompt": "读 project.json 和 qc_report.json,像导演一样找出不合格镜头,把 shot_id+原因写到 redo.json。",
+  "cwd": "/media/proj01",
+  "allowedTools": ["Read","Write","Glob"]
+}</pre><button class="copy">复制</button></div>
+  </div>
+
+  <details><summary>快速验证:不搭服务,用 Execute Command 直调 CLI</summary>
+    <p>n8n Execute Command 节点直接跑(注意 <b>别加 <code>--bare</code></b>,否则会跳过技能和记忆):</p>
+    <div class="cb"><div class="cap">前提:claude 已装进 n8n 容器 / 或在宿主机跑</div>
+<pre>claude -p "读 novel.txt 改编成剧本写到 screenplay.md" \
+  --add-dir /media/proj01 \
+  --allowedTools "Read,Write" \
+  --permission-mode acceptEdits \
+  --output-format json</pre><button class="copy">复制</button></div>
+    <p>输出 JSON 含 <code>result</code> / <code>session_id</code> / <code>total_cost_usd</code>,用 Code 节点 <code>JSON.parse</code> 取。要强制结构化输出加 <code>--json-schema '{...}'</code>(结果在 <code>structured_output</code> 字段)。</p>
+  </details>
+
+  <!-- 续接 -->
+  <h2 id="series"><span class="n">4</span>系列圣经连续性(做剧集必用)</h2>
+  <p>第 1 集改编时 bridge 返回 <code>session_id</code>,存进 n8n(或写进 project.json)。第 2 集请求带上 <code>"resume": "那个session_id"</code>,Claude Code 就<b>记得第 1 集的人物、伏笔、世界观</b>,保证跨集连续——对《锦衣少年行》5 季架构是刚需。</p>
+
+  <!-- 切换 -->
+  <h2 id="toggle"><span class="n">5</span>Claude Code / 本地 vLLM 一键切换</h2>
+  <p><code>SUB_script.json</code> 已内置一个开关:传入 <code>engine: "claude"</code> 走 Claude Code(创作强、文本上云),传 <code>engine: "vllm"</code> 走本地大模型(全本地)。两条分支输出统一归一化后写同一个 <code>screenplay.md</code>。导入后把 <code>B_HOST_IP</code> / <code>A_HOST_IP</code> 改成你的真实地址即可。</p>
+
+  <!-- 分步 -->
+  <h2 id="do"><span class="n">6</span>分步怎么做</h2>
+  <ol>
+    <li>B 宿主机配 <code>ANTHROPIC_API_KEY</code></li>
+    <li>下载 bridge 三件套,<code>npm install</code> + <code>pm2 start</code>,curl 测通</li>
+    <li>n8n 加 HTTP 节点调 bridge,先把“小说→剧本”跑通,去 <code>/media</code> 看有没有 <code>screenplay.md</code></li>
+    <li>导入 <code>SUB_script.json</code>,串进主流水线</li>
+    <li>接上“剧本→分镜→(A 生视频)→本地配音配乐→ffmpeg 粗剪”</li>
+    <li>加 <code>session_id</code> 续接,做到逐集连续</li>
+    <li>接第 10 步质检复核,产出 <code>redo.json</code> 驱动重做</li>
+  </ol>
+
+  <div class="foot">
+    <p>← <a href="index.html">主指南</a> · <a href="advanced.html">进阶部署(12 卡配置 + n8n 导入)</a></p>
+    <p style="margin-top:12px;color:#5a6172">画面/视频/声音全程本地 · 仅文本经 Claude Code 上云 ☁️</p>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.cb .copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var old = btn.textContent; btn.textContent='已复制 ✓';
+        setTimeout(function(){ btn.textContent=old; }, 1400);
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "claude-bridge",
+  "version": "1.0.0",
+  "description": "HTTP bridge so n8n can call Claude Code (Agent SDK) for film-pipeline creative stages",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node claude-bridge.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "express": "^4.19.2"
+  }
+}
