@@ -1,0 +1,221 @@
+{
+  "name": "影视流水线 · SUB_render (ComfyUI 直连版·不经 SwarmUI)",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "project", "type": "string" },
+            { "name": "stage", "type": "string" }
+          ]
+        }
+      },
+      "id": "c-trigger",
+      "name": "开始 (project + stage)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-1160, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "=/media/{{ $json.project }}/project.json",
+        "options": {}
+      },
+      "id": "c-read",
+      "name": "读 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [-940, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 摊平待渲染镜头,并按轮询方式把每镜分给一个 ComfyUI 端点(每卡一个实例)\nconst ENDPOINTS = [\n  'http://localhost:8188',   // ← 改成你每张卡的 ComfyUI 地址\n  'http://localhost:8189',\n  'http://localhost:8190'\n];\nconst stage = $('开始 (project + stage)').first().json.stage;\nconst proj = JSON.parse(Buffer.from($input.first().binary.data.data, 'base64').toString());\nconst out = [];\nlet idx = 0;\nfor (const sc of proj.scenes) {\n  for (const sh of sc.shots) {\n    const need = stage === 'keyframe' ? !sh.keyframe : !sh.clip;\n    if (!need && sh.status !== 'failed') continue;\n    out.push({ json: {\n      project: proj.project, stage, aspect: proj.aspect, style_global: proj.style_global,\n      shot_id: sh.id, duration: sh.duration, shot_size: sh.shot_size, camera: sh.camera,\n      prompt_visual: sh.prompt_visual, keyframe_path: sh.keyframe, seed: (idx * 7 + 1),\n      endpoint: ENDPOINTS[idx % ENDPOINTS.length]   // 轮询分卡\n    }});\n    idx++;\n  }\n}\nreturn out;"
+      },
+      "id": "c-flatten",
+      "name": "展开镜头 + 轮询分卡",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=job:{{ $('开始 (project + stage)').first().json.project }}:{{ $('开始 (project + stage)').first().json.stage }}:total",
+        "value": "={{ $items().length }}",
+        "keyType": "automatic"
+      },
+      "id": "c-total",
+      "name": "Redis: 记总数 total",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [-500, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "c-loop",
+      "name": "逐镜投递 (Split in Batches)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-280, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 把参数注入你的 ComfyUI 工作流模板(在 ComfyUI 里用 Save(API Format) 导出后,把 JSON 粘到 TEMPLATE)\n// 下面的节点号(6/3/10/9)按你自己的工作流实际编号改。\nconst s = $json;\nconst isVideo = s.stage === 'video';\nconst TEMPLATE = {\n  // ←←← 这里粘贴你从 ComfyUI 导出的 API 格式工作流(此处仅示意结构)\n};\nconst graph = JSON.parse(JSON.stringify(TEMPLATE));\nconst prompt = `${s.prompt_visual}, ${s.style_global}, ${s.shot_size} shot, ${s.camera} camera`;\nif (graph['6']) graph['6'].inputs.text = prompt;                 // 正向提示节点\nif (graph['3']) graph['3'].inputs.seed = s.seed;                 // KSampler 种子\nif (isVideo && graph['10']) graph['10'].inputs.image = s.keyframe_path; // LoadImage(图生视频)\nif (graph['9']) graph['9'].inputs.filename_prefix = `${s.stage}s/${s.shot_id}`; // 输出前缀\nreturn [{ json: {\n  endpoint: s.endpoint, shot_id: s.shot_id, project: s.project, stage: s.stage,\n  body: { prompt: graph, client_id: 'n8n' }\n}}];"
+      },
+      "id": "c-build",
+      "name": "组装 ComfyUI 工作流",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.endpoint }}/prompt",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "c-submit",
+      "name": "提交 ComfyUI /prompt (拿 prompt_id)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [160, 460]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=map:{{ $('组装 ComfyUI 工作流').item.json.project }}:{{ $('组装 ComfyUI 工作流').item.json.shot_id }}",
+        "value": "={{ $('组装 ComfyUI 工作流').item.json.endpoint }}|{{ $json.prompt_id }}",
+        "keyType": "automatic"
+      },
+      "id": "c-map",
+      "name": "Redis: 存 endpoint|prompt_id",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [380, 460]
+    },
+    {
+      "parameters": { "amount": 15, "unit": "seconds" },
+      "id": "c-wait",
+      "name": "等 15 秒",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [160, 140]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "done",
+        "key": "=job:{{ $('开始 (project + stage)').first().json.project }}:{{ $('开始 (project + stage)').first().json.stage }}:done",
+        "options": {}
+      },
+      "id": "c-getdone",
+      "name": "Redis: 读 done 计数",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [380, 140]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ Number($json.done) || 0 }}",
+              "rightValue": "={{ $items('Redis: 记总数 total').length }}",
+              "operator": { "type": "number", "operation": "lt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c-if",
+      "name": "还没做完? (done < total)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [600, 140]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "=/media/{{ $('开始 (project + stage)').first().json.project }}/project.json",
+        "options": {}
+      },
+      "id": "c-reread",
+      "name": "重读 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [820, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 回填产物路径(ComfyUI 的 SaveImage/VHS 输出落在 filename_prefix 指定处)\nconst stage = $('开始 (project + stage)').first().json.stage;\nconst proj = JSON.parse(Buffer.from($input.first().binary.data.data, 'base64').toString());\nfor (const sc of proj.scenes) {\n  for (const sh of sc.shots) {\n    const base = `/media/${proj.project}/${stage}s/${sh.id}`;\n    if (stage === 'keyframe') { sh.keyframe = `${base}_00001_.png`; }\n    else { sh.clip = `${base}.mp4`; }\n    sh.status = 'rendered';\n  }\n}\nreturn [{ json: proj, binary: { data: await this.helpers.prepareBinaryData(Buffer.from(JSON.stringify(proj, null, 2)), 'project.json', 'application/json') } }];"
+      },
+      "id": "c-fill",
+      "name": "回填产物路径",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 260]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/media/{{ $json.project }}/project.json",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "c-write",
+      "name": "写回 project.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [1260, 260]
+    },
+    {
+      "parameters": { "workflowId": "REPLACE_SUB_qc_ID", "options": {} },
+      "id": "c-qc",
+      "name": "逐镜质检 (SUB_qc)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1480, 260]
+    },
+    {
+      "parameters": {},
+      "id": "c-out",
+      "name": "返回 (本阶段完成)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1700, 260]
+    }
+  ],
+  "connections": {
+    "开始 (project + stage)": { "main": [[{ "node": "读 project.json", "type": "main", "index": 0 }]] },
+    "读 project.json": { "main": [[{ "node": "展开镜头 + 轮询分卡", "type": "main", "index": 0 }]] },
+    "展开镜头 + 轮询分卡": { "main": [[{ "node": "Redis: 记总数 total", "type": "main", "index": 0 }]] },
+    "Redis: 记总数 total": { "main": [[{ "node": "逐镜投递 (Split in Batches)", "type": "main", "index": 0 }]] },
+    "逐镜投递 (Split in Batches)": { "main": [
+      [{ "node": "等 15 秒", "type": "main", "index": 0 }],
+      [{ "node": "组装 ComfyUI 工作流", "type": "main", "index": 0 }]
+    ] },
+    "组装 ComfyUI 工作流": { "main": [[{ "node": "提交 ComfyUI /prompt (拿 prompt_id)", "type": "main", "index": 0 }]] },
+    "提交 ComfyUI /prompt (拿 prompt_id)": { "main": [[{ "node": "Redis: 存 endpoint|prompt_id", "type": "main", "index": 0 }]] },
+    "Redis: 存 endpoint|prompt_id": { "main": [[{ "node": "逐镜投递 (Split in Batches)", "type": "main", "index": 0 }]] },
+    "等 15 秒": { "main": [[{ "node": "Redis: 读 done 计数", "type": "main", "index": 0 }]] },
+    "Redis: 读 done 计数": { "main": [[{ "node": "还没做完? (done < total)", "type": "main", "index": 0 }]] },
+    "还没做完? (done < total)": { "main": [
+      [{ "node": "等 15 秒", "type": "main", "index": 0 }],
+      [{ "node": "重读 project.json", "type": "main", "index": 0 }]
+    ] },
+    "重读 project.json": { "main": [[{ "node": "回填产物路径", "type": "main", "index": 0 }]] },
+    "回填产物路径": { "main": [[{ "node": "写回 project.json", "type": "main", "index": 0 }]] },
+    "写回 project.json": { "main": [[{ "node": "逐镜质检 (SUB_qc)", "type": "main", "index": 0 }]] },
+    "逐镜质检 (SUB_qc)": { "main": [[{ "node": "返回 (本阶段完成)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}
